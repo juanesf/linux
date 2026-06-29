@@ -718,6 +718,10 @@ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
 		.compatible = "allwinner,sun50i-h616-hdmi-phy",
 		.data = &sun50i_h616_hdmi_phy,
 	},
+	{
+		.compatible = "allwinner,sun55i-a523-hdmi-phy",
+		.data = &sun50i_h616_hdmi_phy,
+	},
 	{ /* sentinel */ }
 };
 

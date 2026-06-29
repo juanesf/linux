@@ -2282,6 +2282,10 @@ static const struct of_device_id sun4i_codec_of_match[] = {
 		.data = &sun50i_h616_codec_quirks,
 	},
 	{
+		.compatible = "allwinner,sun55i-a523-codec",
+		.data = &sun50i_h616_codec_quirks,
+	},
+	{
 		.compatible = "allwinner,suniv-f1c100s-codec",
 		.data = &suniv_f1c100s_codec_quirks,
 	},
