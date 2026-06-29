@@ -7,6 +7,8 @@
 #include <dt-bindings/clock/sun55i-a523-mcu-ccu.h>
 #include <dt-bindings/clock/sun55i-a523-r-ccu.h>
 #include <dt-bindings/clock/sun8i-tcon-top.h>
+#include <dt-bindings/clock/sun8i-de2.h>
+#include <dt-bindings/reset/sun8i-de2.h>
 #include <dt-bindings/reset/sun55i-a523-ccu.h>
 #include <dt-bindings/reset/sun55i-a523-mcu-ccu.h>
 #include <dt-bindings/reset/sun55i-a523-r-ccu.h>
@@ -117,14 +119,13 @@
 		#size-cells = <1>;
 		ranges = <0x0 0x0 0x0 0x40000000>;
 
-		bus@1000000 {
+		bus@5000000 {
 			compatible = "allwinner,sun55i-a523-de35",
 				     "allwinner,sun50i-a64-de2";
-			reg = <0x1000000 0x400000>;
-			allwinner,sram = <&de_sram 1>;
+			reg = <0x5000000 0x400000>;
 			#address-cells = <1>;
 			#size-cells = <1>;
-			ranges = <0 0x1000000 0x400000>;
+			ranges = <0 0x5000000 0x400000>;
 
 			display_clocks: clock@8000 {
 				compatible = "allwinner,sun55i-a523-de35-clk";
@@ -513,20 +514,6 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 			ranges;
-
-			de_sram: sram@20000 {
-				compatible = "mmio-sram";
-				reg = <0x00020000 0x100000>;
-				#address-cells = <1>;
-				#size-cells = <1>;
-				ranges = <0 0x00020000 0x100000>;
-
-				de_sram_section: sram-section@0 {
-					compatible = "allwinner,sun55i-a523-sram-c",
-						     "allwinner,sun50i-a64-sram-c";
-					reg = <0x0 0x1e000>;
-				};
-			};
 		};
 
 		dma: dma-controller@3002000 {
@@ -995,12 +982,12 @@
 			#dma-cells = <1>;
 		};
 
-		hdmi: hdmi@6000000 {
+		hdmi: hdmi@5520000 {
 			compatible = "allwinner,sun55i-a523-dw-hdmi",
 				     "allwinner,sun50i-h6-dw-hdmi";
-			reg = <0x06000000 0x10000>;
+			reg = <0x05520000 0x10000>;
 			reg-io-width = <1>;
-			interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_24M>,
 				 <&tcon_top CLK_TCON_TOP_TV0>,
 				 <&ccu CLK_HDMI_CEC>;
@@ -1031,10 +1018,10 @@
 			};
 		};
 
-		hdmi_phy: hdmi-phy@6010000 {
+		hdmi_phy: hdmi-phy@5530000 {
 			compatible = "allwinner,sun55i-a523-hdmi-phy",
 				     "allwinner,sun50i-h616-hdmi-phy";
-			reg = <0x06010000 0x10000>;
+			reg = <0x05530000 0x10000>;
 			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_24M>;
 			clock-names = "bus", "mod";
 			resets = <&ccu RST_BUS_HDMI_SUB>;
@@ -1042,10 +1029,10 @@
 			#phy-cells = <0>;
 		};
 
-		tcon_top: tcon-top@6510000 {
+		tcon_top: tcon-top@5500000 {
 			compatible = "allwinner,sun55i-a523-tcon-top",
 				     "allwinner,sun50i-h6-tcon-top";
-			reg = <0x06510000 0x1000>;
+			reg = <0x05500000 0x1000>;
 			clocks = <&ccu CLK_BUS_DISPLAY0_TOP>,
 				 <&ccu CLK_TCON_TV0>;
 			clock-names = "bus",
@@ -1101,11 +1088,11 @@
 			};
 		};
 
-		tcon_tv0: lcd-controller@6515000 {
+		tcon_tv0: lcd-controller@5503000 {
 			compatible = "allwinner,sun55i-a523-tcon-tv",
 				     "allwinner,sun50i-h616-tcon-tv";
-			reg = <0x06515000 0x1000>;
-			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+			reg = <0x05503000 0x1000>;
+			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&ccu CLK_BUS_TCON_TV0>,
 				 <&tcon_top CLK_TCON_TOP_TV0>;
 			clock-names = "ahb",
@@ -1142,12 +1129,12 @@
 			};
 		};
 
-		codec: codec@7090000 {
+		codec: codec@7110000 {
 			#sound-dai-cells = <0>;
 			compatible = "allwinner,sun55i-a523-codec",
 				     "allwinner,sun50i-h616-codec";
-			reg = <0x07090000 0x31c>;
-			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
+			reg = <0x07110000 0x31c>;
+			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&mcu_ccu CLK_BUS_MCU_AUDIO_CODEC>,
 				 <&mcu_ccu CLK_MCU_AUDIO_CODEC_DAC>;
 			clock-names = "apb", "codec";

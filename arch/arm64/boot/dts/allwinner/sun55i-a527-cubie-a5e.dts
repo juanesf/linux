@@ -33,48 +33,6 @@
 		};
 	};
 
-	sound {
-		compatible = "simple-audio-card";
-		simple-audio-card,name = "sun55i-a523-codec";
-		simple-audio-card,format = "i2s";
-		simple-audio-card,frame-master = <&cpudai>;
-		simple-audio-card,bitclock-master = <&cpudai>;
-
-		simple-audio-card,widgets = "Headphone", "Headphone Jack",
-					    "Microphone", "Microphone Jack";
-		simple-audio-card,routing = "Headphone Jack", "HP",
-					    "MIC1", "Microphone Jack";
-
-		cpudai: simple-audio-card,cpu {
-			sound-dai = <&i2s0>;
-		};
-
-		simple-audio-card,codec {
-			sound-dai = <&codec>;
-		};
-	};
-
-	sound {
-		compatible = "simple-audio-card";
-		simple-audio-card,name = "sun55i-a523-codec";
-		simple-audio-card,format = "i2s";
-		simple-audio-card,frame-master = <&cpudai>;
-		simple-audio-card,bitclock-master = <&cpudai>;
-
-		simple-audio-card,widgets = "Headphone", "Headphone Jack",
-					    "Microphone", "Microphone Jack";
-		simple-audio-card,routing = "Headphone Jack", "HP",
-					    "MIC1", "Microphone Jack";
-
-		cpudai: simple-audio-card,cpu {
-			sound-dai = <&i2s0>;
-		};
-
-		simple-audio-card,codec {
-			sound-dai = <&codec>;
-		};
-	};
-
 	reg_vcc3v3_hdmi: vcc3v3-hdmi {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc-hdmi";
@@ -440,5 +398,37 @@
 &usbphy {
 	usb0_vbus-supply = <&reg_vcc5v>;
 	usb1_vbus-supply = <&reg_usb_vbus>;
+	status = "okay";
+};
+
+&codec {
+	allwinner,audio-routing = "Headphone", "LINEOUT";
+	status = "okay";
+};
+
+&de {
+	status = "okay";
+};
+
+&hdmi {
+	hvcc-supply = <&reg_vcc3v3_hdmi>;
+	status = "okay";
+};
+
+&hdmi_out {
+	hdmi_connector_out: endpoint {
+		remote-endpoint = <&hdmi_connector_in>;
+	};
+};
+
+&hdmi_phy {
+	status = "okay";
+};
+
+&tcon_top {
+	status = "okay";
+};
+
+&tcon_tv0 {
 	status = "okay";
 };
