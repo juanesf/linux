@@ -1185,13 +1185,6 @@ static const struct sun8i_hdmi_phy_variant sun50i_h616_hdmi_phy = {
 	.phy_init = &sun50i_hdmi_phy_init_h6,
 };
 
-static const struct sun8i_hdmi_phy_variant sun50i_h616_hdmi_phy = {
-	.cur_ctr  = sun50i_h616_cur_ctr,
-	.mpll_cfg = sun50i_h616_mpll_cfg,
-	.phy_cfg  = sun50i_h616_phy_config,
-	.phy_init = &sun50i_hdmi_phy_init_h6,
-};
-
 static const struct sun8i_hdmi_phy_variant sun55i_a523_hdmi_phy = {
 	.phy_ops	= &sun55i_a523_hdmi_phy_ops,
 	.regmap_config	= &sun55i_a523_hdmi_phy_regmap_config,
@@ -1217,14 +1210,6 @@ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
 	{
 		.compatible = "allwinner,sun50i-h6-hdmi-phy",
 		.data = &sun50i_h6_hdmi_phy,
-	},
-	{
-		.compatible = "allwinner,sun50i-h616-hdmi-phy",
-		.data = &sun50i_h616_hdmi_phy,
-	},
-	{
-		.compatible = "allwinner,sun55i-a523-hdmi-phy",
-		.data = &sun50i_h616_hdmi_phy,
 	},
 	{
 		.compatible = "allwinner,sun50i-h616-hdmi-phy",
