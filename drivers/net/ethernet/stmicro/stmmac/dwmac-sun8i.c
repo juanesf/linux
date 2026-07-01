@@ -65,12 +65,14 @@ struct emac_variant {
  */
 struct sunxi_priv_data {
 	struct clk *ephy_clk;
+	struct clk *emac_25m_clk;
 	struct regulator *regulator;
 	struct reset_control *rst_ephy;
 	const struct emac_variant *variant;
 	struct regmap_field *regmap_field;
 	bool internal_phy_powered;
 	bool use_internal_phy;
+	bool use_25m_clk;
 	void *mux_handle;
 };
 
@@ -576,6 +578,12 @@ static int sun8i_dwmac_init(struct device *dev, void *priv)
 	struct net_device *ndev = dev_get_drvdata(dev);
 	struct sunxi_priv_data *gmac = priv;
 	int ret;
+
+	if (gmac->use_25m_clk) {
+		gmac->emac_25m_clk = devm_clk_get_enabled(dev, "emac25m");
+		if (IS_ERR(gmac->emac_25m_clk))
+			return PTR_ERR(gmac->emac_25m_clk);
+	}
 
 	if (gmac->regulator) {
 		ret = regulator_enable(gmac->regulator);
@@ -1129,6 +1137,9 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Missing dwmac-sun8i variant\n");
 		return -EINVAL;
 	}
+
+	if (of_property_read_bool(dev->of_node, "allwinner,use-25m-clk"))
+		gmac->use_25m_clk = true;
 
 	/* Optional regulator for PHY */
 	gmac->regulator = devm_regulator_get_optional(dev, "phy");

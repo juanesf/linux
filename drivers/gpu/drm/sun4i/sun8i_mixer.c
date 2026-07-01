@@ -8,6 +8,7 @@
  */
 
 #include <linux/component.h>
+#include <linux/delay.h>
 #include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -265,6 +266,28 @@ static void sun8i_mixer_commit(struct sunxi_engine *engine,
 
 	DRM_DEBUG_DRIVER("Committing changes\n");
 
+	/*
+	 * v35x DE: the datapath (blender, formatter, layers) commits only via
+	 * the RCQ DMA into a CPU-written shadow; plain MMIO never latches. The
+	 * sun55i_de backend owns all datapath programming. Stage each visible
+	 * plane into the shadow, then (re)arm the queue.
+	 */
+	if (mixer->cfg->uses_rcq) {
+		drm_for_each_plane(plane, state->dev) {
+			if (!(plane->possible_crtcs & drm_crtc_mask(crtc)))
+				continue;
+
+			plane_state = drm_atomic_get_new_plane_state(state, plane);
+			if (!plane_state)
+				plane_state = plane->state;
+
+			sun55i_de_layer_update(mixer, plane_to_sun8i_layer(plane),
+					       plane_state);
+		}
+		sun55i_de_commit(mixer);
+		return;
+	}
+
 	drm_for_each_plane(plane, state->dev) {
 		struct sun8i_layer *layer = plane_to_sun8i_layer(plane);
 		int w, h, x, y, zpos;
@@ -384,6 +407,12 @@ static void sun8i_mixer_mode_set(struct sunxi_engine *engine,
 	u32 bld_base, size, val;
 	bool interlaced;
 
+	/* v35x DE: top control via MMIO, datapath sizes staged into the RCQ */
+	if (mixer->cfg->uses_rcq) {
+		sun55i_de_mode_set(mixer, mode);
+		return;
+	}
+
 	bld_base = sun8i_blender_base(mixer);
 	interlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
 	size = SUN8I_MIXER_SIZE(mode->hdisplay, mode->vdisplay);
@@ -438,6 +467,19 @@ static const struct regmap_config sun8i_top_regmap_config = {
 	.max_register	= 0x3c,
 };
 
+/*
+ * v35x DE top mux/control block (DE base + 0x8000): DE2TCON_MUX, channel mux,
+ * ASYNC_BRIDGE, BUF_DEPTH. This range overlaps the de33-clk "clock@8000" node,
+ * so it is mapped without an exclusive request (see the bind).
+ */
+static const struct regmap_config sun8i_detop_regmap_config = {
+	.name		= "detop",
+	.reg_bits	= 32,
+	.val_bits	= 32,
+	.reg_stride	= 4,
+	.max_register	= 0x60,
+};
+
 static int sun8i_mixer_of_get_id(struct device_node *node)
 {
 	struct device_node *ep, *remote;
@@ -463,6 +505,17 @@ static void sun8i_mixer_init(struct sun8i_mixer *mixer)
 	unsigned int base = sun8i_blender_base(mixer);
 	struct regmap *top_regs;
 	int plane_cnt, i;
+
+	/*
+	 * v35x DE: the datapath only latches via the RCQ, so MMIO blender init
+	 * below is a no-op here. sun55i_de owns top/blender/formatter setup; we
+	 * just pick the background color (visible until a layer is enabled).
+	 * Green by default so first-light is unambiguous vs the blank screen.
+	 */
+	if (mixer->cfg->uses_rcq) {
+		mixer->de_bg_color = 0xff00ff00;
+		return;
+	}
 
 	if (mixer->cfg->de_type == SUN8I_MIXER_DE33)
 		top_regs = mixer->top_regs;
@@ -526,6 +579,7 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
 	if (!mixer)
 		return -ENOMEM;
 	dev_set_drvdata(dev, mixer);
+	mixer->dev = dev;
 	mixer->engine.node = dev->of_node;
 
 	if (of_property_present(dev->of_node, "iommus")) {
@@ -581,6 +635,29 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
 		if (IS_ERR(mixer->top_regs)) {
 			dev_err(dev, "Couldn't create the top regmap\n");
 			return PTR_ERR(mixer->top_regs);
+		}
+	}
+
+	if (mixer->cfg->uses_rcq) {
+		struct resource *res;
+
+		/*
+		 * The DE top mux/control block overlaps the de33-clk node, so
+		 * map it without an exclusive request_mem_region().
+		 */
+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "detop");
+		if (!res)
+			return -EINVAL;
+
+		regs = devm_ioremap(dev, res->start, resource_size(res));
+		if (!regs)
+			return -ENOMEM;
+
+		mixer->detop_regs = devm_regmap_init_mmio(dev, regs,
+						&sun8i_detop_regmap_config);
+		if (IS_ERR(mixer->detop_regs)) {
+			dev_err(dev, "Couldn't create the DE top regmap\n");
+			return PTR_ERR(mixer->detop_regs);
 		}
 	}
 
@@ -680,6 +757,14 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
 	}
 
 	sun8i_mixer_init(mixer);
+
+	if (mixer->cfg->uses_rcq) {
+		ret = sun55i_de_init(mixer);
+		if (ret) {
+			dev_err(dev, "Couldn't set up the v35x DE RCQ engine\n");
+			goto err_disable_mod_clk;
+		}
+	}
 
 	return 0;
 
@@ -890,6 +975,10 @@ static const struct sun8i_mixer_cfg sun50i_h616_mixer0_cfg = {
 static const struct sun8i_mixer_cfg sun55i_a523_mixer0_cfg = {
 	.de_type	= SUN8I_MIXER_DE33,
 	.mod_rate	= 600000000,
+	.ui_num		= 3,
+	.vi_num		= 1,
+	.map		= {0, 6, 7, 8},
+	.uses_rcq	= true,
 };
 
 static const struct of_device_id sun8i_mixer_of_table[] = {
@@ -942,7 +1031,7 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
 		.data = &sun50i_h616_mixer0_cfg,
 	},
 	{
-		.compatible = "allwinner,sun55i-a523-de35-mixer-0",
+		.compatible = "allwinner,sun55i-a523-de33-mixer-0",
 		.data = &sun55i_a523_mixer0_cfg,
 	},
 	{ }

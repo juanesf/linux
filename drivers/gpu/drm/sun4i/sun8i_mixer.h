@@ -12,6 +12,7 @@
 #include <drm/drm_plane.h>
 
 #include "sunxi_engine.h"
+#include "sun55i_de.h"
 
 #define SUN8I_MIXER_SIZE(w, h)			(((h) - 1) << 16 | ((w) - 1))
 #define SUN8I_MIXER_COORD(x, y)			((y) << 16 | (x))
@@ -23,6 +24,17 @@
 
 #define SUN50I_MIXER_GLOBAL_SIZE		0x8
 #define SUN50I_MIXER_GLOBAL_CLK			0xc
+
+/*
+ * v35x DE (A523/sun55iw3) "RCQ" (register config queue). These registers live
+ * in the mixer "top" block (same regmap as GLOBAL_CTL). Unlike the H616 DE33,
+ * the v35x active pipeline only updates from a DMA register-list ("RCQ heads")
+ * on vsync; direct MMIO writes populate a shadow that never latches on its own.
+ */
+#define SUN55I_MIXER_RCQ_CTL			0x10	/* write 1 to trigger */
+#define SUN55I_MIXER_RCQ_HEAD_LADDR		0x14	/* head array phys [31:0] */
+#define SUN55I_MIXER_RCQ_HEAD_HADDR		0x18	/* head array phys [hi]  */
+#define SUN55I_MIXER_RCQ_HEAD_LEN		0x1c	/* head array size, bytes */
 
 #define SUN8I_MIXER_GLOBAL_CTL_RT_EN		BIT(0)
 
@@ -202,6 +214,9 @@ struct sun8i_mixer_cfg {
 	int			ui_num;
 	unsigned int		de_type;
 	unsigned long		mod_rate;
+	unsigned int		map[6];
+	/* v35x DE commits the pipeline via the RCQ DMA, not plain MMIO */
+	bool			uses_rcq;
 };
 
 struct sun8i_mixer {
@@ -215,7 +230,15 @@ struct sun8i_mixer {
 	struct clk			*mod_clk;
 
 	struct regmap			*top_regs;
+	struct regmap			*disp_regs;
+
 	struct device			*planes_dev;
+
+	/* v35x DE (only when cfg->uses_rcq) */
+	struct device			*dev;
+	struct regmap			*detop_regs;	/* DE top mux/control 0x8000 */
+	struct sun55i_de		*de;		/* RCQ engine state */
+	u32				de_bg_color;	/* background (AARRGGBB) */
 };
 
 enum {

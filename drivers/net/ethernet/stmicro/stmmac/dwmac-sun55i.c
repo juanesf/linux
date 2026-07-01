@@ -108,6 +108,7 @@ static int sun55i_gmac200_probe(struct platform_device *pdev)
 	struct stmmac_resources stmmac_res;
 	struct device *dev = &pdev->dev;
 	struct clk *clk;
+	struct clk *emac_25m_clk;
 	int ret;
 
 	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
@@ -130,6 +131,13 @@ static int sun55i_gmac200_probe(struct platform_device *pdev)
 	if (IS_ERR(clk))
 		return dev_err_probe(dev, PTR_ERR(clk),
 				     "Failed to get or enable MBUS clock\n");
+
+	if (of_property_read_bool(dev->of_node, "allwinner,use-25m-clk")) {
+		emac_25m_clk = devm_clk_get_enabled(dev, "emac25m");
+		if (IS_ERR(emac_25m_clk))
+			return dev_err_probe(dev, PTR_ERR(emac_25m_clk),
+					     "Failed to get or enable 25M PHY clock\n");
+	}
 
 	ret = devm_regulator_get_enable_optional(dev, "phy");
 	if (ret)

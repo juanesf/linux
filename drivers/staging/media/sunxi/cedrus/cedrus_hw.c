@@ -273,11 +273,13 @@ int cedrus_hw_probe(struct cedrus_dev *dev)
 		return ret;
 	}
 
-	ret = sunxi_sram_claim(dev->dev);
-	if (ret) {
-		dev_err(dev->dev, "Failed to claim SRAM\n");
+	if (!variant->quirk_no_sram) {
+		ret = sunxi_sram_claim(dev->dev);
+		if (ret) {
+			dev_err(dev->dev, "Failed to claim SRAM\n");
 
-		goto err_mem;
+			goto err_mem;
+		}
 	}
 
 	dev->ahb_clk = devm_clk_get(dev->dev, "ahb");

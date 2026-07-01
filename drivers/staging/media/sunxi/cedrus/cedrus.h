@@ -175,6 +175,13 @@ struct cedrus_dec_ops {
 struct cedrus_variant {
 	unsigned int	capabilities;
 	unsigned int	mod_rate;
+	/*
+	 * Newer SoCs (e.g. A523/sun55iw3) have no dedicated VE SRAM region to
+	 * remap via the system-control block; the VE does physical DMA from
+	 * the CMA pool with the IOMMU in bypass. Skip sunxi_sram_claim() for
+	 * those, which would otherwise fail with -ENOENT (no allwinner,sram).
+	 */
+	bool		quirk_no_sram;
 };
 
 struct cedrus_dev {

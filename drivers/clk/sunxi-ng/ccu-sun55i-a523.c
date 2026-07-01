@@ -584,13 +584,22 @@ static const struct clk_parent_data iommu_parents[] = {
 	{ .fw_name = "hosc" },
 };
 
+/*
+ * The IOMMU sits in the memory fabric between the display/video masters and
+ * DRAM. Even when it is not used for translation (the DE uses raw physical
+ * addresses in mainline), the master traffic still passes through it, so its
+ * functional clock must stay on or DE fetches come back corrupted. Nothing
+ * claims it yet, so mark it critical to keep clk_disable_unused() from gating
+ * it (otherwise boards need clk_ignore_unused on the cmdline). Proper fix is
+ * to manage it from an IOMMU driver.
+ */
 static SUNXI_CCU_MP_DATA_WITH_MUX_GATE_FEAT(iommu_clk, "iommu", iommu_parents,
 					    0x7b0,
 					    0, 5,	/* M */
 					    0, 0,	/* no P */
 					    24, 3,	/* mux */
 					    BIT(31),	/* gate */
-					    CLK_SET_RATE_PARENT,
+					    CLK_SET_RATE_PARENT | CLK_IS_CRITICAL,
 					    CCU_FEATURE_UPDATE_BIT);
 
 static SUNXI_CCU_GATE_HWS(bus_iommu_clk, "bus-iommu", apb0_hws, 0x7bc,
@@ -897,6 +906,23 @@ static SUNXI_CCU_GATE_HWS(bus_display1_top_clk, "bus-display1-top", ahb_hws,
 			  0xacc, BIT(0), 0);
 
 static SUNXI_CCU_GATE_DATA(hdmi_24M_clk, "hdmi-24M", osc24M, 0xb04, BIT(31), 0);
+
+/*
+ * Main HDMI TMDS ("mod") clock. Register 0xb00 follows the H616 layout
+ * (hdmi-24M@0xb04 and bus-hdmi@0xb1c are byte-identical to H616), sourced
+ * from the video PLLs; the dw-hdmi driver sets it to the pixel clock.
+ */
+static const struct clk_hw *hdmi_tmds_parents[] = {
+	&pll_video0_4x_clk.common.hw,
+	&pll_video1_4x_clk.common.hw,
+	&pll_video2_4x_clk.common.hw,
+	&pll_video3_4x_clk.common.hw,
+};
+static SUNXI_CCU_M_HW_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_tmds_parents, 0xb00,
+				    0, 4,	/* M */
+				    24, 2,	/* mux */
+				    BIT(31),	/* gate */
+				    CLK_SET_RATE_PARENT);
 
 static SUNXI_CCU_GATE_HWS_WITH_PREDIV(hdmi_cec_32k_clk, "hdmi-cec-32k",
 				      pll_periph0_2x_hws,
@@ -1314,6 +1340,7 @@ static struct ccu_common *sun55i_a523_ccu_clks[] = {
 	&bus_display0_top_clk.common,
 	&bus_display1_top_clk.common,
 	&hdmi_24M_clk.common,
+	&hdmi_clk.common,
 	&hdmi_cec_32k_clk.common,
 	&hdmi_cec_clk.common,
 	&bus_hdmi_clk.common,
@@ -1497,6 +1524,7 @@ static struct clk_hw_onecell_data sun55i_a523_hw_clks = {
 		[CLK_BUS_DISPLAY0_TOP]	= &bus_display0_top_clk.common.hw,
 		[CLK_BUS_DISPLAY1_TOP]	= &bus_display1_top_clk.common.hw,
 		[CLK_HDMI_24M]		= &hdmi_24M_clk.common.hw,
+		[CLK_HDMI]		= &hdmi_clk.common.hw,
 		[CLK_HDMI_CEC_32K]	= &hdmi_cec_32k_clk.common.hw,
 		[CLK_HDMI_CEC]		= &hdmi_cec_clk.common.hw,
 		[CLK_BUS_HDMI]		= &bus_hdmi_clk.common.hw,
@@ -1539,7 +1567,7 @@ static struct clk_hw_onecell_data sun55i_a523_hw_clks = {
 		[CLK_FANOUT2]		= &fanout2_clk.common.hw,
 		[CLK_NPU]		= &npu_clk.common.hw,
 	},
-	.num	= CLK_NPU + 1,
+	.num	= CLK_HDMI + 1,
 };
 
 static struct ccu_reset_map sun55i_a523_ccu_resets[] = {

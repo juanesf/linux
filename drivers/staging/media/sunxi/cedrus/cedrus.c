@@ -647,6 +647,22 @@ static const struct cedrus_variant sun50i_h6_cedrus_variant = {
 	.mod_rate	= 600000000,
 };
 
+/*
+ * A523 (sun55iw3) shares the H264/H265/MPEG2 register layout with the
+ * H6/D1 family; the per-frame register programming matches cedrus 1:1
+ * (see RE notes). VE module clock parent runs at 432 MHz like the D1.
+ * Start minimal: 8-bit H264/H265/MPEG2 only. VP8 and 10-bit HEVC not
+ * yet validated on this SoC.
+ */
+static const struct cedrus_variant sun55i_a523_cedrus_variant = {
+	.capabilities	= CEDRUS_CAPABILITY_UNTILED |
+			  CEDRUS_CAPABILITY_MPEG2_DEC |
+			  CEDRUS_CAPABILITY_H264_DEC |
+			  CEDRUS_CAPABILITY_H265_DEC,
+	.mod_rate	= 432000000,
+	.quirk_no_sram	= true,
+};
+
 static const struct of_device_id cedrus_dt_match[] = {
 	{
 		.compatible = "allwinner,sun4i-a10-video-engine",
@@ -691,6 +707,10 @@ static const struct of_device_id cedrus_dt_match[] = {
 	{
 		.compatible = "allwinner,sun50i-h6-video-engine",
 		.data = &sun50i_h6_cedrus_variant,
+	},
+	{
+		.compatible = "allwinner,sun55i-a523-video-engine",
+		.data = &sun55i_a523_cedrus_variant,
 	},
 	{ /* sentinel */ }
 };
