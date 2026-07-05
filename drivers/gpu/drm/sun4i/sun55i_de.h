@@ -20,6 +20,8 @@
 #ifndef _SUN55I_DE_H_
 #define _SUN55I_DE_H_
 
+#include <linux/hrtimer.h>
+#include <linux/spinlock.h>
 #include <linux/types.h>
 
 struct sun8i_mixer;
@@ -70,6 +72,7 @@ enum {
 	SUN55I_DE_BLK_VSU_COEFF2,	/* c_hori_coeff (unity) */
 	SUN55I_DE_BLK_TFBD_CTL,	/* tiled-FB decoder ctrl: zeroed (de_tfbd_disable) */
 	SUN55I_DE_BLK_CCSC_CTL,	/* channel CSC ctl: zeroed (en=0 bypass) */
+	SUN55I_DE_BLK_CDC_CTL,	/* channel CDC colour ctl: zeroed (de_cdc_disable) */
 	SUN55I_DE_BLK_NUM
 };
 
@@ -93,6 +96,43 @@ struct sun55i_de {
 	unsigned int			nheads;
 	struct sun55i_de_block		blocks[SUN55I_DE_BLK_NUM];
 	unsigned int			tcon_id;
+	struct sun8i_mixer		*mixer;		/* back-ref for the timer */
+
+	/*
+	 * Beam-gated arm. The RCQ latches ~immediately when armed and is not
+	 * frame-gated by hardware, so the arm (RCQ_CTL=1) must be issued while
+	 * the beam is in the vertical blanking region or the new datapath -
+	 * including the new framebuffer address - tears in mid-frame. The
+	 * vblank IRQ that drives the arm is serviced with large, load-dependent
+	 * latency, so arming straight from it drops the load at a random
+	 * scanline. Instead we replicate the vendor BSP (disp_mgr_protect_reg_
+	 * for_rcq): read the TCON's current scanline, and either arm now if the
+	 * beam is safely inside the leading blanking, or schedule an hrtimer to
+	 * fire at the computed time the beam next re-enters blanking and arm
+	 * there. Either way the arm lands in blanking by construction,
+	 * regardless of IRQ-servicing jitter.
+	 */
+	spinlock_t			arm_lock;	/* arm_pending + timer */
+	struct hrtimer			arm_timer;	/* fires in next blanking */
+	bool				arm_pending;	/* RCQ staged, not armed */
+	bool				armed_once;	/* datapath fully loaded once */
+	/*
+	 * Full-reload arms left to issue after a modeset. A single full-reload
+	 * RCQ load does not reliably latch every block (live-verified: the
+	 * first apply after boot lands nothing; a repeat apply of the same
+	 * list lands everything), so the first arms after a mode_set re-issue
+	 * the full-dirty list on consecutive vblanks until this drains.
+	 */
+	unsigned int			full_arms_left;
+	u32				line_total;	/* TCON line counter modulus */
+	u32				arm_target;	/* safe arm line (vendor calc) */
+	u32				ns_per_line;	/* counter-tick period (ns) */
+
+	/* TEMP instrumentation — revert with the dev_info diagnostics */
+	u32				commit_seq;	/* commits staged */
+	u32				arm_seq;	/* RCQ arms issued */
+	u32				coalesced;	/* stages overwritten pre-arm */
+	u32				arm_deferred;	/* arms pushed to the timer */
 };
 
 int sun55i_de_init(struct sun8i_mixer *mixer);
@@ -101,5 +141,6 @@ void sun55i_de_mode_set(struct sun8i_mixer *mixer,
 void sun55i_de_layer_update(struct sun8i_mixer *mixer, struct sun8i_layer *layer,
 			    struct drm_plane_state *state);
 void sun55i_de_commit(struct sun8i_mixer *mixer);
+void sun55i_de_vblank_quirk(struct sun8i_mixer *mixer, unsigned int cur_line);
 
 #endif /* _SUN55I_DE_H_ */

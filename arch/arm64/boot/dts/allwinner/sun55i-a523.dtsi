@@ -151,6 +151,8 @@
 				clock-names = "bus", "mod";
 				resets = <&display_clocks RST_MIXER0>;
 				power-domains = <&pck600 PD_DE>;
+				/* Vendor micro-TLB map: the whole DE is master 5 */
+				iommus = <&iommu 5>;
 
 				ports {
 					#address-cells = <1>;
@@ -333,6 +335,16 @@
 				      "iosc", "losc-fanout";
 			#clock-cells = <1>;
 			#reset-cells = <1>;
+		};
+
+		iommu: iommu@2010000 {
+			compatible = "allwinner,sun55i-a523-iommu",
+				     "allwinner,sun50i-h616-iommu";
+			reg = <0x02010000 0x1000>;
+			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&ccu CLK_BUS_IOMMU>;
+			resets = <&ccu RST_BUS_IOMMU>;
+			#iommu-cells = <1>;
 		};
 
 		wdt: watchdog@2050000 {

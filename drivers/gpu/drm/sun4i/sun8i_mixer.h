@@ -31,10 +31,21 @@
  * the v35x active pipeline only updates from a DMA register-list ("RCQ heads")
  * on vsync; direct MMIO writes populate a shadow that never latches on its own.
  */
+#define SUN55I_MIXER_RCQ_STATUS			0x04	/* de_top_query_state */
 #define SUN55I_MIXER_RCQ_CTL			0x10	/* write 1 to trigger */
 #define SUN55I_MIXER_RCQ_HEAD_LADDR		0x14	/* head array phys [31:0] */
 #define SUN55I_MIXER_RCQ_HEAD_HADDR		0x18	/* head array phys [hi]  */
 #define SUN55I_MIXER_RCQ_HEAD_LEN		0x1c	/* head array size, bytes */
+
+/*
+ * RCQ status bits (vendor de_top_query_state*): the BSP reads these in its
+ * frame-start IRQ to detect that the DMA accepted the queue (FINISHED) and that
+ * a load is in flight (BUSY). It does NOT gate the arm on them - the arm is
+ * gated on the beam position + a software flag - so these are used here only for
+ * completion diagnostics and a defensive "don't re-arm over an in-flight load".
+ */
+#define SUN55I_MIXER_RCQ_STATUS_FINISHED	BIT(2)
+#define SUN55I_MIXER_RCQ_STATUS_BUSY		BIT(4)
 
 #define SUN8I_MIXER_GLOBAL_CTL_RT_EN		BIT(0)
 

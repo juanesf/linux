@@ -84,5 +84,6 @@
 #define RST_BUS_LEDC		75
 #define RST_BUS_CSI		76
 #define RST_BUS_ISP		77
+#define RST_BUS_IOMMU		78
 
 #endif /* _DT_BINDINGS_RST_SUN55I_A523_CCU_H_ */

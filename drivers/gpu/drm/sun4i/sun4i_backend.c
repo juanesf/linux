@@ -608,7 +608,8 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
 	return 0;
 }
 
-static void sun4i_backend_vblank_quirk(struct sunxi_engine *engine)
+static void sun4i_backend_vblank_quirk(struct sunxi_engine *engine,
+				       unsigned int cur_line)
 {
 	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
 	struct sun4i_frontend *frontend = backend->frontend;

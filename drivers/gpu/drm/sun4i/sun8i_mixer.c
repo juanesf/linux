@@ -439,10 +439,21 @@ static void sun8i_mixer_mode_set(struct sunxi_engine *engine,
 			 interlaced ? "on" : "off");
 }
 
+static void sun8i_mixer_vblank_quirk(struct sunxi_engine *engine,
+				     unsigned int cur_line)
+{
+	struct sun8i_mixer *mixer = engine_to_sun8i_mixer(engine);
+
+	/* v35x DE: arm the RCQ staged by the last commit, gated to blanking */
+	if (mixer->cfg->uses_rcq)
+		sun55i_de_vblank_quirk(mixer, cur_line);
+}
+
 static const struct sunxi_engine_ops sun8i_engine_ops = {
 	.commit		= sun8i_mixer_commit,
 	.layers_init	= sun8i_layers_init,
 	.mode_set	= sun8i_mixer_mode_set,
+	.vblank_quirk	= sun8i_mixer_vblank_quirk,
 };
 
 static const struct sunxi_engine_ops sun50i_engine_ops = {

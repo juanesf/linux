@@ -26,17 +26,15 @@
 		ranges;
 
 		/*
-		 * The display engine's layer DMA master has a limited fetch
-		 * aperture and can only reach low DRAM (it reads the RCQ pool at
-		 * ~0x43000000 but not 0x4b100000). The kernel's default CMA is
-		 * high (~0xf0000000), so scanout fetches zeros (black). Pin CMA
-		 * just above the kernel image (ends ~0x42c70000) and the RCQ
-		 * pool (~0x43000000), below the dtb (~0x49ff6000).
+		 * With the DE and VE behind the IOMMU their buffers come from
+		 * dma-iommu, so CMA no longer needs to be pinned into the low
+		 * DRAM window the DE can reach in bypass; keep a generously
+		 * sized pool anywhere in RAM for the remaining CMA users.
 		 */
 		linux,cma {
 			compatible = "shared-dma-pool";
 			reusable;
-			reg = <0x0 0x44000000 0x0 0x04000000>;
+			size = <0x0 0x10000000>;
 			linux,cma-default;
 		};
 	};

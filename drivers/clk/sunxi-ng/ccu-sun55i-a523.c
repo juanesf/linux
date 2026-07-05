@@ -1588,6 +1588,12 @@ static struct ccu_reset_map sun55i_a523_ccu_resets[] = {
 	[RST_BUS_DBG]		= { 0x78c, BIT(16) },
 	[RST_BUS_PWM0]		= { 0x7ac, BIT(16) },
 	[RST_BUS_PWM1]		= { 0x7ac, BIT(17) },
+	/*
+	 * Not documented for the A523, but the IOMMU BGR keeps the H6/H616
+	 * layout (gate at bit 0), where the reset sits at bit 16 of the same
+	 * register.
+	 */
+	[RST_BUS_IOMMU]		= { 0x7bc, BIT(16) },
 	[RST_BUS_DRAM]		= { 0x80c, BIT(16) },
 	[RST_BUS_NAND]		= { 0x82c, BIT(16) },
 	[RST_BUS_MMC0]		= { 0x84c, BIT(16) },

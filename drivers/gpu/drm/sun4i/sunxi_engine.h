@@ -110,8 +110,12 @@ struct sunxi_engine_ops {
 	 * possible.
 	 *
 	 * This function is optional.
+	 *
+	 * @cur_line is the TCON's current scanout line at the time the vblank
+	 * IRQ is serviced, so a frame-coherent engine can gate hardware that
+	 * latches immediately (e.g. the v35x RCQ) on the blanking window.
 	 */
-	void (*vblank_quirk)(struct sunxi_engine *engine);
+	void (*vblank_quirk)(struct sunxi_engine *engine, unsigned int cur_line);
 
 	/**
 	 * @mode_set

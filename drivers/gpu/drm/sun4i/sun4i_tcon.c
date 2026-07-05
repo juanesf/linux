@@ -40,6 +40,50 @@
 #include "sun8i_tcon_top.h"
 #include "sunxi_engine.h"
 
+/*
+ * TEMP instrumentation for the sun55iw3 (DE33/v35x RCQ) HDMI page-flip tearing
+ * investigation. The RCQ load is not hardware frame-gated; it latches ~when
+ * armed. We arm from this TCON's vblank IRQ (vblank_quirk), so the tear-safety
+ * depends entirely on *where the beam is* when the IRQ fires.
+ *
+ *  - SUN4I_TCON_CUR_FRM_LINE_REG (0xfc): current scanout position.
+ *      bits[11:0]  = current line (Y), bits[27:16] = current pixel (X).
+ *    (vendor disp.ko tcon_get_cur_line reads this for all TCONs.)
+ *
+ *  - tv_vblank_line: when >= 0, program GINT1 so the TCON1/TV-pipe vblank IRQ
+ *    fires at this internal line instead of 0. GINT1[28:16] = TCON1 line int
+ *    number. Writable at runtime (sysfs), applied on the next vblank-enable
+ *    (i.e. the next modetest invocation). Lets us walk the arm point into the
+ *    blanking region and confirm the tear disappears, with no rebuild.
+ *
+ * NOTE: sun4i_tcon1_mode_set doubles vtotal for progressive modes, so this
+ * internal line counter is expected to run ~0..2*vtotal. Read the logged raw
+ * value to pick a blanking-region line.
+ */
+#define SUN4I_TCON_CUR_FRM_LINE_REG	0xfc
+#define SUN4I_TCON_GINT1_TCON1_LINE(l)	(((l) & 0x1fff) << 16)
+
+static int tv_vblank_line = -1;
+module_param(tv_vblank_line, int, 0644);
+MODULE_PARM_DESC(tv_vblank_line,
+		 "TEMP: TCON1/TV vblank IRQ line (GINT1[28:16]); <0 = leave at 0");
+
+/*
+ * TEMP: non-perturbing arm-line probe. Updated in the vblank hardirq (no
+ * printk — serial console output there blocks ~9.5ms and corrupts the very
+ * timing we measure). Read via /sys/module/sun4i_tcon/parameters/. Reset on
+ * each vblank-enable (i.e. each modetest run). min~=max => arm fires at a
+ * fixed line; a wide spread => the arm is genuinely non-deterministic.
+ */
+static int arm_line_last = -1;
+static int arm_line_min = 0x7fffffff;
+static int arm_line_max = -1;
+static int arm_line_count;
+module_param(arm_line_last, int, 0444);
+module_param(arm_line_min, int, 0444);
+module_param(arm_line_max, int, 0444);
+module_param(arm_line_count, int, 0444);
+
 static struct drm_connector *sun4i_tcon_get_connector(const struct drm_encoder *encoder)
 {
 	struct drm_connector *connector;
@@ -237,6 +281,22 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
 		val = mask;
 
 	regmap_update_bits(tcon->regs, SUN4I_TCON_GINT0_REG, mask, val);
+
+	/* TEMP: move the TCON1/TV vblank IRQ line for the RCQ-arm timing probe */
+	if (enable && tv_vblank_line >= 0) {
+		regmap_write(tcon->regs, SUN4I_TCON_GINT1_REG,
+			     SUN4I_TCON_GINT1_TCON1_LINE(tv_vblank_line));
+		DRM_DEV_INFO(tcon->dev, "TEMP: GINT1 vblank line set to %d\n",
+			     tv_vblank_line);
+	}
+
+	/* TEMP: reset the arm-line probe stats at the start of each run */
+	if (enable) {
+		arm_line_last = -1;
+		arm_line_min = 0x7fffffff;
+		arm_line_max = -1;
+		arm_line_count = 0;
+	}
 }
 EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
 
@@ -756,7 +816,7 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
 	struct drm_device *drm = tcon->drm;
 	struct sun4i_crtc *scrtc = tcon->crtc;
 	struct sunxi_engine *engine = scrtc->engine;
-	unsigned int status;
+	unsigned int status, cur_pos = 0, cur_line;
 
 	regmap_read(tcon->regs, SUN4I_TCON_GINT0_REG, &status);
 
@@ -775,8 +835,24 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
 			   SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT,
 			   0);
 
+	/*
+	 * Current scanout position: bits[11:0] = line (counter runs 0..vtotal).
+	 * The v35x RCQ latches immediately when armed, so the engine's
+	 * vblank_quirk uses this to arm only while the beam is in blanking.
+	 */
+	regmap_read(tcon->regs, SUN4I_TCON_CUR_FRM_LINE_REG, &cur_pos);
+	cur_line = cur_pos & 0xfff;
+
+	/* TEMP probe: record where the IRQ is serviced (non-perturbing) */
+	arm_line_last = cur_line;
+	if ((int)cur_line < arm_line_min)
+		arm_line_min = cur_line;
+	if ((int)cur_line > arm_line_max)
+		arm_line_max = cur_line;
+	arm_line_count++;
+
 	if (engine->ops->vblank_quirk)
-		engine->ops->vblank_quirk(engine);
+		engine->ops->vblank_quirk(engine, cur_line);
 
 	return IRQ_HANDLED;
 }
