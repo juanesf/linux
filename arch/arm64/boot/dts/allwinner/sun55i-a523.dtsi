@@ -108,7 +108,7 @@
 	};
 
 	de: display-engine {
-		compatible = "allwinner,sun50i-h6-display-engine";
+		compatible = "allwinner,sun55i-a523-display-engine";
 		allwinner,pipelines = <&mixer0>;
 		status = "disabled";
 	};
@@ -1044,6 +1044,7 @@
 			clock-names = "iahb", "isfr", "tmds", "cec";
 			resets = <&ccu RST_BUS_HDMI_MAIN>;
 			reset-names = "ctrl";
+			power-domains = <&pck600 PD_VO0>;
 			phys = <&hdmi_phy>;
 			phy-names = "phy";
 			pinctrl-names = "default";
@@ -1076,6 +1077,7 @@
 			clock-names = "bus", "mod";
 			resets = <&ccu RST_BUS_HDMI_SUB>;
 			reset-names = "phy";
+			power-domains = <&pck600 PD_VO0>;
 			#phy-cells = <0>;
 		};
 
